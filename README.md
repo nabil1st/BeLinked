@@ -1,4 +1,4 @@
 # BeLinked: Family tree starter app
 
-### This is a social networking application intended for users to build their family trees. 
+### This is a social networking application where users can build their family trees. 
 
