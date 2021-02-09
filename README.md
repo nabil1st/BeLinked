@@ -1,1 +1,1 @@
-# BeLinked
+# BeLinked: Family tree starter app

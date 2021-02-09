@@ -1,0 +1,146 @@
+<beans:beans xmlns="http://www.springframework.org/schema/security"
+	xmlns:beans="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:p="http://www.springframework.org/schema/p" xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+		http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+		http://www.springframework.org/schema/security 
+		http://www.springframework.org/schema/security/spring-security-3.2.xsd
+		http://www.springframework.org/schema/util 
+		http://www.springframework.org/schema/util/spring-util-3.2.xsd">
+ 
+	<!-- alias should be same as filter name you have defined in web.xml for Spring Security -->
+	<beans:alias name="filterChainProxy" alias="springSecurityFilterChain"/>
+	
+	<!-- filterChainProxy actually creates a security filter chain which had been automatically done for us by &lt;http&gt;. -->
+	<beans:bean id="filterChainProxy" class="org.springframework.security.web.FilterChainProxy">
+	    <filter-chain-map path-type="ant">
+	        <!-- We don't need to apply security filters on our css, javascript and image files. -->
+	        <filter-chain pattern="/site/**" filters="none" />
+	        <filter-chain pattern="/css/**" filters="none" />
+			<filter-chain pattern="/js/**" filters="none" />
+			<filter-chain pattern="/images/**" filters="none" />			
+			<filter-chain pattern="/photomakerservlet/**" filters="none" />
+			
+	        <!-- For rest of the URLs, we specify a filter set. Keep in mind that order of filters is important. You can add more filters or remove any existing from the chain depending upon your requirements. -->
+			<filter-chain pattern="/**" filters="securityContextFilter, logoutFilter, formLoginFilter, requestCacheFilter,
+	               servletApiFilter, rememberMeAuthenticationFilter, anonFilter, sessionMgmtFilter, exceptionTranslator, filterSecurityInterceptor" />
+	    </filter-chain-map>
+	</beans:bean>
+	
+	<!-- This class holds UserDetails object once a user is authenticated. -->	
+	<beans:bean id="securityContextRepository" class="org.springframework.security.web.context.HttpSessionSecurityContextRepository" />
+	
+	<!-- This filter adds UserDetails object to securityContextRepository once a user is authenticated. -->
+	<beans:bean id="securityContextFilter" class="org.springframework.security.web.context.SecurityContextPersistenceFilter" >
+	    <beans:property name="securityContextRepository" ref="securityContextRepository" />
+	</beans:bean>
+	
+	<!-- As name suggests, this filter handles a logout event initiated by user.-->	
+	<beans:bean id="logoutFilter" class="org.springframework.security.web.authentication.logout.LogoutFilter">
+	    <!-- The page that you would like to redirect after logout is complete. -->
+	    <beans:constructor-arg value="/" />
+	    <!-- A list of LogoutHandler(s) that you would like to invoke when logout is triggered.-->
+	    <beans:constructor-arg>
+	        <beans:list>
+	            <!-- A reference to rememberMeServices (which implements LogoutHandler) is required to clear remember me cookie. -->
+	       	    <beans:ref local="rememberMeServices"/>
+	            <!-- SecurityContextLogoutHandler would clear UserDetails object from securityContextRepository. -->
+		    <beans:bean class="org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler" />
+		</beans:list>
+	    </beans:constructor-arg>
+	</beans:bean>
+	
+	<!-- Allows username/password based authentication. -->	
+	<beans:bean id="formLoginFilter" class="org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter">
+	    <!-- A reference to rememberMeServices is required to add a remember me cookie on login. -->
+	    <beans:property name="rememberMeServices" ref="rememberMeServices"/>
+	    <!-- Authenticates login request. -->
+	    <beans:property name="authenticationManager" ref="authenticationManager" />
+	    <!-- Reference to an implementation of AuthenticationSuccessHandler, whose onAuthenticationSuccess method will be invoked if login attempt was successful. -->
+	    <beans:property name="authenticationSuccessHandler">
+	        <beans:bean class="org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler">
+	            <beans:property name="defaultTargetUrl" value="/categories" />
+	        </beans:bean>
+	    </beans:property>
+	    <beans:property name="sessionAuthenticationStrategy">
+	        <beans:bean class="org.springframework.security.web.authentication.session.SessionFixationProtectionStrategy" />
+	    </beans:property>
+	</beans:bean>
+		
+	<beans:bean id="requestCacheFilter" class="org.springframework.security.web.savedrequest.RequestCacheAwareFilter" />
+	 
+	<beans:bean id="servletApiFilter" class="org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter" />
+		 
+	<beans:bean id="anonFilter" class="org.springframework.security.web.authentication.AnonymousAuthenticationFilter" >
+	    <beans:property name="key" value="SomeUniqueKeyForThisApplication" />
+	    <beans:property name="userAttribute" value="anonymousUser,ROLE_ANONYMOUS" />
+	</beans:bean>
+		 
+	<beans:bean id="sessionMgmtFilter" class="org.springframework.security.web.session.SessionManagementFilter" >
+	    <beans:constructor-arg ref="securityContextRepository" />
+	</beans:bean>
+	
+	<beans:bean id="rememberMeServices" class="org.springframework.security.web.authentication.rememberme.TokenBasedRememberMeServices">
+	    <beans:property name="key" value="HEAR_ME_ROAR"/>
+	    <beans:property name="userDetailsService" ref="userManager"/>
+	</beans:bean>
+		
+	<beans:bean id="rememberMeAuthenticationFilter" class="org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter">
+	    <beans:property name="rememberMeServices" ref="rememberMeServices"/>
+	    <beans:property name="authenticationManager" ref="authenticationManager"/>
+	</beans:bean>
+		
+	<beans:bean id="rememberMeAuthenticationProvider" class="org.springframework.security.authentication.RememberMeAuthenticationProvider">
+	    <beans:property name="key" value="HEAR_ME_ROAR"/>
+	</beans:bean>
+		 
+	<beans:bean id="filterSecurityInterceptor" class="org.springframework.security.web.access.intercept.FilterSecurityInterceptor">
+	    <beans:property name="securityMetadataSource">
+	        <filter-security-metadata-source>
+	            <intercept-url pattern="/" access="IS_AUTHENTICATED_ANONYMOUSLY" />	            
+	            <intercept-url pattern="/transactions**" access="ROLE_USER"/>
+	            <intercept-url pattern="/categories**" access="ROLE_USER"/>
+		    <intercept-url pattern="/change-password**" access="ROLE_USER"/>
+		    <intercept-url pattern="/invite-friend**" access="ROLE_USER"/>	
+		    <intercept-url pattern="/ajax/json/**" access="ROLE_USER"/>			
+		</filter-security-metadata-source>
+	    </beans:property>
+	    <beans:property name="authenticationManager" ref="authenticationManager" />
+	    <beans:property name="accessDecisionManager" ref="accessDecisionManager" />
+	</beans:bean>
+		
+	<beans:bean id="accessDecisionManager" class="org.springframework.security.access.vote.AffirmativeBased">
+	    <beans:property name="decisionVoters">
+	        <beans:list>
+	            <beans:bean class="org.springframework.security.access.vote.RoleVoter"/>
+	            <beans:bean class="org.springframework.security.access.vote.AuthenticatedVoter"/>
+	        </beans:list>
+	    </beans:property>
+	</beans:bean>
+		
+	<beans:bean id="webPrivilegeEvaluator" class="org.springframework.security.web.access.DefaultWebInvocationPrivilegeEvaluator">
+	    <beans:constructor-arg ref="filterSecurityInterceptor" />
+	</beans:bean>
+	
+	<beans:bean id="userManager" class="com.belinked.services.CustomUserDetailsService"/>
+		
+	<authentication-manager alias="authenticationManager">
+	    <authentication-provider user-service-ref="userManager">
+		<password-encoder hash="md5">
+	            <salt-source user-property="dateCreated"/>
+		</password-encoder>
+	    </authentication-provider>
+	    <authentication-provider ref="rememberMeAuthenticationProvider"/>
+	</authentication-manager>
+		
+	<beans:bean id="exceptionTranslator" class="com.belinked.filters.MyExceptionTranslationFilter">
+	    <beans:property name="authenticationEntryPoint">
+	        <beans:bean class="org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint">
+	            <beans:property name="loginFormUrl" value="/"/>
+	        </beans:bean>
+	    </beans:property>
+	    <beans:property name="accessDeniedHandler">
+	        <beans:bean class="com.belinked.security.MyAccessDeniedHandlerImpl"/>
+	    </beans:property>
+	</beans:bean>
+</beans:beans>
